@@ -2871,9 +2871,11 @@ template <auto V, auto A, auto B, typename... Ts, typename Parameters> static co
 	return pcre_context{ctll::push_front(string<A,B>(), ctll::list<Ts...>()), subject.parameters};
 }
 // make_sequence (concat string)
+/*
 template <auto V, auto A, auto... Bs, typename... Ts, typename Parameters> static constexpr auto apply(pcre::make_sequence, ctll::term<V>, pcre_context<ctll::list<string<Bs...>,character<A>,Ts...>, Parameters> subject) {
 	return pcre_context{ctll::push_front(string<A,Bs...>(), ctll::list<Ts...>()), subject.parameters};
 }
+*/
 
 // make_sequence (make string in front of different items)
 template <auto V, auto A, auto B, typename... Sq, typename... Ts, typename Parameters> static constexpr auto apply(pcre::make_sequence, ctll::term<V>, pcre_context<ctll::list<sequence<character<B>,Sq...>,character<A>,Ts...>, Parameters> subject) {
