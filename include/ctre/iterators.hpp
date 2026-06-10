@@ -26,12 +26,13 @@ template <typename BeginIterator, typename EndIterator, typename RE, typename Re
 	BeginIterator current{};
 	EndIterator end{};
 	value_type current_match{};
+	int _treshold = 0;
 	
 	constexpr CTRE_FORCE_INLINE regex_iterator() noexcept = default;
 	constexpr CTRE_FORCE_INLINE regex_iterator(const regex_iterator &) noexcept = default;
 	constexpr CTRE_FORCE_INLINE regex_iterator(regex_iterator &&) noexcept = default;
 
-	constexpr CTRE_FORCE_INLINE regex_iterator(BeginIterator begin, EndIterator last) noexcept: orig_begin{begin}, current{begin}, end{last}, current_match{RE::template exec_with_result_iterator<ResultIterator>(current, last)} {
+	constexpr CTRE_FORCE_INLINE regex_iterator(BeginIterator begin, EndIterator last, int treshold = 0) noexcept: orig_begin{begin}, current{begin}, end{last}, _treshold(treshold), current_match{RE::template exec_with_result_iterator<ResultIterator>(current, last, treshold)} {
 		if (current_match) {
 			current = current_match.template get<0>().end();
 		}
@@ -49,7 +50,7 @@ template <typename BeginIterator, typename EndIterator, typename RE, typename Re
 			return *this;
 		}
 		
-		current_match = RE::template exec_with_result_iterator<ResultIterator>(orig_begin, current, end);
+		current_match = RE::template exec_with_result_iterator<ResultIterator>(orig_begin, current, end, _treshold);
 		
 		if (current_match) {
 			current = current_match.template get<0>().end();

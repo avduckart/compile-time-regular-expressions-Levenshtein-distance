@@ -42,16 +42,22 @@ template <size_t Id, typename Name = void> struct captured_content {
 		Iterator _begin{};
 		Iterator _end{};
 		
-		bool _matched{false};
+		bool _matched{true};
+		bool _success{false};
+		
+		size_t _substs = 0;
+		size_t _insrts = 0;
+		size_t _delets = 0;
+		int treshold = 0;
 	public:
 		using char_type = typename std::iterator_traits<Iterator>::value_type;
 		
 		using name = Name;
 	
-		constexpr CTRE_FORCE_INLINE storage() noexcept {}
+		constexpr CTRE_FORCE_INLINE storage(int treshold = 0) noexcept : _treshold(treshold) {}
 	
 		constexpr CTRE_FORCE_INLINE void matched() noexcept {
-			_matched = true;
+			_matched = ((_substs + _insrts + _delets) <= _treshold);
 		}
 		constexpr CTRE_FORCE_INLINE void unmatch() noexcept {
 			_matched = false;
@@ -67,6 +73,75 @@ template <size_t Id, typename Name = void> struct captured_content {
 			return _end;
 		}
 		
+		constexpr CTRE_FORCE_INLINE void reset() noexcept {
+			_substs = 0;
+			_insrts = 0;
+			_delets = 0;
+			matched();
+		}
+
+		constexpr CTRE_FORCE_INLINE void set_treshold(int treshold) noexcept {
+			_treshold = treshold;
+			matched();
+		}
+
+		constexpr CTRE_FORCE_INLINE bool corrected() noexcept {
+			return _matched;
+		}
+
+		constexpr CTRE_FORCE_INLINE bool accepted() noexcept {
+			return _success;
+		}
+
+		constexpr CTRE_FORCE_INLINE bool success() noexcept {
+			_success = true;
+		}
+
+		constexpr CTRE_FORCE_INLINE bool is_over_treshold() noexcept {
+			return (_treshold < get_distance());
+		}
+
+		constexpr CTRE_FORCE_INLINE bool is_equal_treshold() noexcept {
+			return (_treshold == get_distance());
+		}
+
+		constexpr CTRE_FORCE_INLINE int get_treshold() noexcept {
+			return _treshold;
+		}
+
+		constexpr CTRE_FORCE_INLINE void inc_subst() noexcept {
+			_substs++;
+			matched();
+		}
+
+		constexpr CTRE_FORCE_INLINE void inc_insrt() noexcept {
+			_insrts++;
+			matched();
+		}
+		
+		constexpr CTRE_FORCE_INLINE void inc_delet() noexcept {
+			_delets++;
+			matched();
+		}
+
+		constexpr CTRE_FORCE_INLINE void add_subst(size_t n) noexcept {
+			_substs += n;
+			matched();
+		}
+
+		constexpr CTRE_FORCE_INLINE void add_insrt(size_t n) noexcept {
+			_insrts += n;
+			matched();
+		}
+		
+		constexpr CTRE_FORCE_INLINE void add_delet(size_t n) noexcept {
+			_delets += n;
+			matched();
+		}
+
+		constexpr CTRE_FORCE_INLINE int get_distance() noexcept {
+			return static_cast<int>(_substs  + _insrts + _delets);
+		}
 	
 		constexpr auto begin() const noexcept {
 			return _begin;
@@ -356,11 +431,16 @@ template <typename Iterator, typename... Captures> class regex_results {
 public:
 	using char_type = typename std::iterator_traits<Iterator>::value_type;
 	
-	constexpr CTRE_FORCE_INLINE regex_results() noexcept { }
-	constexpr CTRE_FORCE_INLINE regex_results(not_matched_tag_t) noexcept { }
+	constexpr CTRE_FORCE_INLINE regex_results(int treshold = 0) noexcept { 
+		_captures.template select<0>().set_treshold(treshold);
+	}
+
+	constexpr CTRE_FORCE_INLINE regex_results(not_matched_tag_t) noexcept { 
+		_captures.template select<0>.unmatch();
+	}
 	
 	// special constructor for deducting
-	constexpr CTRE_FORCE_INLINE regex_results(Iterator, ctll::list<Captures...>) noexcept { }
+	constexpr CTRE_FORCE_INLINE regex_results(Iterator, ctll::list<Captures...>, int treshold = 0) noexcept : regex_results(treshold) { }
 	
 	template <size_t Id> CTRE_FORCE_INLINE constexpr auto get() const noexcept {
 		constexpr bool capture_of_provided_id_must_exists = decltype(_captures)::template exists<Id>();
@@ -398,6 +478,55 @@ public:
 	}
 	static constexpr size_t count() noexcept {
 		return sizeof...(Captures) + 1;
+	}
+	constexpr CTRE_FORCE_INLINE regex_results & reset() noexcept {
+		_captures.template select<0>().reset();
+		return *this;
+	}
+	constexpr CTRE_FORCE_INLINE bool accepted() noexcept {
+		return _captures.template select<0>().accepted();
+	}
+	constexpr CTRE_FORCE_INLINE bool corrected() noexcept {
+		return _captures.template select<0>().corrected();
+	}
+	constexpr CTRE_FORCE_INLINE void success() noexcept {
+		_captures.template select<0>().successs();
+	}
+	constexpr CTRE_FORCE_INLINE bool is_over_treshold() noexcept {
+		return _captures.template select<0>().is_over_treshold();
+	}
+	constexpr CTRE_FORCE_INLINE bool is_equal_treshold() noexcept {
+		return _captures.template select<0>().is_equal_treshold();
+	}
+	constexpr CTRE_FORCE_INLINE size_t get_distance() noexcept {
+		return _captures.template select<0>().get_distance();
+	}
+	constexpr CTRE_FORCE_INLINE size_t get_treshold() noexcept {
+		return _captures.template select<0>().get_treshold();
+	}
+	constexpr CTRE_FORCE_INLINE regex_results & inc_subst() noexcept {
+		_captures.template select<0>().inc_subst();
+		return *this;
+	}
+	constexpr CTRE_FORCE_INLINE regex_results & inc_insrt() noexcept {
+		_captures.template select<0>().inc_insrt();
+		return *this;
+	}
+	constexpr CTRE_FORCE_INLINE regex_results & inc_delet() noexcept {
+		_captures.template select<0>().inc_delet();
+		return *this;
+	}
+	constexpr CTRE_FORCE_INLINE regex_results & add_subst(size_t n) noexcept {
+		_captures.template select<0>().add_subst(n);
+		return *this;
+	}
+	constexpr CTRE_FORCE_INLINE regex_results & inc_insrt(size_t n) noexcept {
+		_captures.template select<0>().add_insrt(n);
+		return *this;
+	}
+	constexpr CTRE_FORCE_INLINE regex_results & inc_delet(size_t n) noexcept {
+		_captures.template select<0>().add_delet(n);
+		return *this;
 	}
 	constexpr CTRE_FORCE_INLINE regex_results & matched() noexcept {
 		_captures.template select<0>().matched();

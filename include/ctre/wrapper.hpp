@@ -66,33 +66,35 @@ public:
 };
 
 struct match_method {
-	template <typename Modifier = singleline, typename ResultIterator = void, typename RE, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin orig_begin, IteratorBegin begin, IteratorEnd end, RE) noexcept {
+	template <typename Modifier = singleline, typename ResultIterator = void, typename RE, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin orig_begin, IteratorBegin begin, IteratorEnd end, RE, int treshold) noexcept {
 		using result_iterator = std::conditional_t<std::is_same_v<ResultIterator, void>, IteratorBegin, ResultIterator>;
-
-		return evaluate(orig_begin, begin, end, Modifier{}, return_type<result_iterator, RE>{}, ctll::list<start_mark, RE, assert_subject_end, end_mark, accept>());
+		auto captures = return_type<result_iterator, RE>{treshold};
+		std::deque<decltype(captures)> queue;
+		return evaluate(orig_begin, begin, end, Modifier{}, captures, queue,  ctll::list<start_mark, RE, assert_subject_end, end_mark, accept>());
 	}
 
-	template <typename Modifier = singleline, typename ResultIterator = void, typename RE, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin begin, IteratorEnd end, RE) noexcept {
-		return exec<Modifier, ResultIterator>(begin, begin, end, RE{});
+	template <typename Modifier = singleline, typename ResultIterator = void, typename RE, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin begin, IteratorEnd end, RE, int treshold = 0) noexcept {
+		return exec<Modifier, ResultIterator>(begin, begin, end, RE{}, treshold);
 	}
 };
 
 struct search_method {
-	template <typename Modifier = singleline, typename ResultIterator = void, typename RE, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin orig_begin, IteratorBegin begin, IteratorEnd end, RE) noexcept {
+	template <typename Modifier = singleline, typename ResultIterator = void, typename RE, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin orig_begin, IteratorBegin begin, IteratorEnd end, RE, int treshold) noexcept {
 		using result_iterator = std::conditional_t<std::is_same_v<ResultIterator, void>, IteratorBegin, ResultIterator>;
 
 		constexpr bool fixed = starts_with_anchor(Modifier{}, ctll::list<RE>{});
 
 		auto it = begin;
-
+		auto captures = return_type<result_iterator>{treshold};
+		std::deque<decltype(captures)> queue;
 		for (; end != it && !fixed; ++it) {
-			if (auto out = evaluate(orig_begin, it, end, Modifier{}, return_type<result_iterator, RE>{}, ctll::list<start_mark, RE, end_mark, accept>())) {
+			if (auto out = evaluate(orig_begin, it, end, Modifier{}, captures, queue, ctll::list<start_mark, RE, end_mark, accept>())) {
 				return out;
 			}
 		}
 
 		// in case the RE is empty or fixed
-		auto out = evaluate(orig_begin, it, end, Modifier{}, return_type<result_iterator, RE>{}, ctll::list<start_mark, RE, end_mark, accept>());
+		auto out = evaluate(orig_begin, it, end, Modifier{}, captures, queue, ctll::list<start_mark, RE, end_mark, accept>());
 
 		// ALERT: ugly hack
 		// propagate end even if it didn't match (this is needed for split function)
@@ -100,8 +102,8 @@ struct search_method {
 		return out;
 	}
 
-	template <typename Modifier = singleline, typename ResultIterator = void, typename RE, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin begin, IteratorEnd end, RE) noexcept {
-		return exec<Modifier, ResultIterator>(begin, begin, end, RE{});
+	template <typename Modifier = singleline, typename ResultIterator = void, typename RE, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin begin, IteratorEnd end, RE, int treshold = 0) noexcept {
+		return exec<Modifier, ResultIterator>(begin, begin, end, RE{}, treshold);
 	}
 };
 
@@ -145,11 +147,11 @@ struct split_method {
 };
 
 struct iterator_method {
-	template <typename Modifier = singleline, typename ResultIterator = void, typename RE, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin begin, IteratorEnd end, RE) noexcept {
+	template <typename Modifier = singleline, typename ResultIterator = void, typename RE, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin begin, IteratorEnd end, RE, int treshold = 0) noexcept {
 		using result_iterator = std::conditional_t<std::is_same_v<ResultIterator, void>, IteratorBegin, ResultIterator>;
 		using wrapped_regex = regular_expression<RE, search_method, Modifier>;
 
-		return regex_iterator<IteratorBegin, IteratorEnd, wrapped_regex, result_iterator>(begin, end);
+		return regex_iterator<IteratorBegin, IteratorEnd, wrapped_regex, result_iterator>(begin, end, treshold);
 	}
 	constexpr CTRE_FORCE_INLINE static auto exec() noexcept {
 		return regex_end_iterator{};
@@ -160,11 +162,11 @@ CTRE_EXPORT template <typename RE, typename Method, typename Modifier> struct re
 	constexpr CTRE_FORCE_INLINE regular_expression() noexcept { }
 	constexpr CTRE_FORCE_INLINE regular_expression(RE) noexcept { }
 
-	template <typename ResultIterator, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec_with_result_iterator(IteratorBegin orig_begin, IteratorBegin begin, IteratorEnd end) noexcept {
-		return Method::template exec<Modifier, ResultIterator>(orig_begin, begin, end, RE{});
+	template <typename ResultIterator, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec_with_result_iterator(IteratorBegin orig_begin, IteratorBegin begin, IteratorEnd end, int treshold) noexcept {
+		return Method::template exec<Modifier, ResultIterator>(orig_begin, begin, end, RE{}, treshold);
 	}
-	template <typename ResultIterator, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec_with_result_iterator(IteratorBegin begin, IteratorEnd end) noexcept {
-		return Method::template exec<Modifier, ResultIterator>(begin, end, RE{});
+	template <typename ResultIterator, typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec_with_result_iterator(IteratorBegin begin, IteratorEnd end, int treshold) noexcept {
+		return Method::template exec<Modifier, ResultIterator>(begin, end, RE{}, treshold);
 	}
 	template <typename Range> constexpr CTRE_FORCE_INLINE static auto multi_exec(Range && range) noexcept {
 		return multi_subject_range<Range, regular_expression>{std::forward<Range>(range)};
@@ -172,8 +174,8 @@ CTRE_EXPORT template <typename RE, typename Method, typename Modifier> struct re
 	constexpr CTRE_FORCE_INLINE static auto exec() noexcept {
 		return Method::exec();
 	}
-	template <typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin begin, IteratorEnd end) noexcept {
-		return Method::template exec<Modifier>(begin, end, RE{});
+	template <typename IteratorBegin, typename IteratorEnd> constexpr CTRE_FORCE_INLINE static auto exec(IteratorBegin begin, IteratorEnd end, int treshold = 0) noexcept {
+		return Method::template exec<Modifier>(begin, end, RE{}, treshold);
 	}
 	static constexpr CTRE_FORCE_INLINE auto exec(const char * s) noexcept {
 		return Method::template exec<Modifier>(s, zero_terminated_string_end_iterator(), RE{});
@@ -181,25 +183,25 @@ CTRE_EXPORT template <typename RE, typename Method, typename Modifier> struct re
 	static constexpr CTRE_FORCE_INLINE auto exec(const wchar_t * s) noexcept {
 		return Method::template exec<Modifier>(s, zero_terminated_string_end_iterator(), RE{});
 	}
-	static constexpr CTRE_FORCE_INLINE auto exec(std::string_view sv) noexcept {
-		return exec(sv.begin(), sv.end());
+	static constexpr CTRE_FORCE_INLINE auto exec(std::string_view sv, int treshold = 0) noexcept {
+		return exec(sv.begin(), sv.end(), treshold);
 	}
-	static constexpr CTRE_FORCE_INLINE auto exec(std::wstring_view sv) noexcept {
-		return exec(sv.begin(), sv.end());
+	static constexpr CTRE_FORCE_INLINE auto exec(std::wstring_view sv, int treshold = 0) noexcept {
+		return exec(sv.begin(), sv.end(), treshold);
 	}
 #ifdef CTRE_ENABLE_UTF8_RANGE
 	static constexpr CTRE_FORCE_INLINE auto exec(std::u8string_view sv) noexcept {
 		return exec_with_result_iterator<const char8_t *>(utf8_range(sv).begin(), utf8_range(sv).end());
 	}
 #endif
-	static constexpr CTRE_FORCE_INLINE auto exec(std::u16string_view sv) noexcept {
-		return exec(sv.begin(), sv.end());
+	static constexpr CTRE_FORCE_INLINE auto exec(std::u16string_view sv, int treshold = 0) noexcept {
+		return exec(sv.begin(), sv.end(), treshold);
 	}
-	static constexpr CTRE_FORCE_INLINE auto exec(std::u32string_view sv) noexcept {
-		return exec(sv.begin(), sv.end());
+	static constexpr CTRE_FORCE_INLINE auto exec(std::u32string_view sv, int treshold = 0) noexcept {
+		return exec(sv.begin(), sv.end(), treshold);
 	}
-	template <typename Range, typename = typename std::enable_if<RangeLikeType<Range>::value>::type> static constexpr CTRE_FORCE_INLINE auto exec(Range && range) noexcept {
-		return exec(std::begin(range), std::end(range));
+	template <typename Range, typename = typename std::enable_if<RangeLikeType<Range>::value>::type> static constexpr CTRE_FORCE_INLINE auto exec(Range && range, int treshold = 0) noexcept {
+		return exec(std::begin(range), std::end(range), treshold);
 	}
 
 	// another api
